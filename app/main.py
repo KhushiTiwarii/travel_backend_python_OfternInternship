@@ -2,10 +2,22 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from . import models, schemas, database
 from .database import SessionLocal, engine
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import joinedload
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# Add this middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React/Next.js frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 def get_db():
     db = SessionLocal()
@@ -43,7 +55,15 @@ def create_itinerary(itinerary: schemas.TripItineraryCreate, db: Session = Depen
 
 @app.get("/itineraries/")
 def get_itineraries(db: Session = Depends(get_db)):
-    return db.query(models.TripItinerary).all()
+    itineraries = db.query(models.TripItinerary).options(
+        joinedload(models.TripItinerary.days)
+        .joinedload(models.Day.hotel),
+        joinedload(models.TripItinerary.days)
+        .joinedload(models.Day.transfers),
+        joinedload(models.TripItinerary.days)
+        .joinedload(models.Day.activities)
+    ).all()
+    return itineraries
 
 @app.get("/recommendations/{nights}")
 def get_recommendation(nights: int, db: Session = Depends(get_db)):
